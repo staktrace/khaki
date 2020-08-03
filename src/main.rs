@@ -3,6 +3,7 @@ extern crate hmac_sha256;
 
 use std::env;
 use std::fs;
+use std::io;
 use std::path::{Path, PathBuf};
 
 fn usage() {
@@ -65,6 +66,28 @@ fn digest(stuff: &[u8]) -> String {
     hex
 }
 
+fn preprocess(input: &fs::File, output_base: &Path) -> io::Result<()> {
+    use io::{BufRead, Write};
+
+    let mut processed_path = PathBuf::from(output_base);
+    processed_path.set_extension("rs");
+
+    // TODO: some sort of locking here to avoid concurrently-running `krust` instances writing to `processed_path`
+    let mut processed = fs::File::create(&processed_path)?;
+
+    // TODO: poke rustc folks about source maps or #line macros or such. See rust-lang/rfcs#1573
+    let bufreader = io::BufReader::new(input);
+    for (number, line) in bufreader.lines().enumerate() {
+        let line = line?;
+        if number == 0 && line.starts_with("#!/") {
+            // assume shebang, so let's drop it
+            continue;
+        }
+        writeln!(processed, "{}", line)?;
+    }
+    processed.sync_all()
+}
+
 fn main() {
     let mut args = env::args().skip(1);
     let script_path = match args.next() {
@@ -77,4 +100,7 @@ fn main() {
     let path_digest = digest_path(&script_path);
     let mut executable = cachedir.clone();
     executable.push(path_digest);
+
+    let krustfile = fs::File::open(&script_path).expect(&format!("Unable to open input script {}", script_path.display()));
+    preprocess(&krustfile, &executable).unwrap();
 }
