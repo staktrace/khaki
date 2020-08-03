@@ -2,6 +2,7 @@ extern crate dirs;
 extern crate hmac_sha256;
 
 use std::env;
+use std::fmt::Write;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -56,8 +57,6 @@ fn digest_path(path: &Path) -> String {
 }
 
 fn digest(stuff: &[u8]) -> String {
-    use std::fmt::Write;
-
     let hash = hmac_sha256::Hash::hash(stuff);
     let mut hex = String::with_capacity(hash.len() * 2);
     for b in &hash {
@@ -67,14 +66,10 @@ fn digest(stuff: &[u8]) -> String {
 }
 
 fn preprocess(input: &fs::File, output_base: &Path) -> io::Result<()> {
-    use io::{BufRead, Write};
+    use io::BufRead;
 
-    let mut processed_path = PathBuf::from(output_base);
-    processed_path.set_extension("rs");
-
-    // TODO: some sort of locking here to avoid concurrently-running `krust` instances writing to `processed_path`
-    let mut processed = fs::File::create(&processed_path)?;
-
+    let mut has_main = false;
+    let mut processed = String::new();
     // TODO: poke rustc folks about source maps or #line macros or such. See rust-lang/rfcs#1573
     let bufreader = io::BufReader::new(input);
     for (number, line) in bufreader.lines().enumerate() {
@@ -83,9 +78,21 @@ fn preprocess(input: &fs::File, output_base: &Path) -> io::Result<()> {
             // assume shebang, so let's drop it
             continue;
         }
-        writeln!(processed, "{}", line)?;
+        if line.starts_with("fn main(") {
+            has_main = true;
+        }
+        writeln!(processed, "{}", line).unwrap();
     }
-    processed.sync_all()
+
+    if !has_main {
+        processed.insert_str(0, "fn main() {\n");
+        processed.push_str("\n}\n");
+    }
+
+    let mut processed_path = PathBuf::from(output_base);
+    processed_path.set_extension("rs");
+    // TODO: some sort of locking here to avoid concurrently-running `krust` instances writing to `processed_path`
+    fs::write(&processed_path, processed)
 }
 
 fn main() {
