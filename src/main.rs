@@ -6,6 +6,7 @@ use std::fmt::Write;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::process;
 
 fn usage() {
     eprintln!("Usage: krust path-to-script.rs [-- args to script]");
@@ -65,7 +66,7 @@ fn digest(stuff: &[u8]) -> String {
     hex
 }
 
-fn preprocess(input: &fs::File, output_base: &Path) -> io::Result<()> {
+fn preprocess(input: &fs::File, output_base: &Path) -> io::Result<PathBuf> {
     use io::BufRead;
 
     let mut has_main = false;
@@ -92,15 +93,31 @@ fn preprocess(input: &fs::File, output_base: &Path) -> io::Result<()> {
     let mut processed_path = PathBuf::from(output_base);
     processed_path.set_extension("rs");
     // TODO: some sort of locking here to avoid concurrently-running `krust` instances writing to `processed_path`
-    fs::write(&processed_path, processed)
+    fs::write(&processed_path, processed)?;
+    Ok(processed_path)
 }
 
 fn main() {
     let mut args = env::args().skip(1);
     let script_path = match args.next() {
-        None => return usage(),
+        None => {
+            usage();
+            process::exit(1);
+        }
         Some(file) => fs::canonicalize(&file).expect(&format!("Unable to get absolute path for {}", &file)),
     };
+
+    loop {
+        match args.next() {
+            None => break,
+            Some(x) if x == "--" => break,
+            Some(_) => {
+                usage();
+                process::exit(2);
+            }
+        }
+    }
+
     let cachedir = cachedir().expect("Unable to find a usable cache directory!");
     fs::create_dir_all(&cachedir).expect(&format!("Error while create cache directory {}", cachedir.display()));
 
@@ -109,5 +126,32 @@ fn main() {
     executable.push(path_digest);
 
     let krustfile = fs::File::open(&script_path).expect(&format!("Unable to open input script {}", script_path.display()));
-    preprocess(&krustfile, &executable).unwrap();
+    let processed_path = preprocess(&krustfile, &executable).unwrap();
+
+    let compiled = process::Command::new("rustc")
+        .arg("-o")
+        .arg(&executable)
+        .arg(&processed_path)
+        .status()
+        .expect("Unable to execute rustc")
+        .success();
+    if !compiled {
+        process::exit(3);
+    }
+
+    let mut script_cmd = process::Command::new(&executable);
+    for arg in args {
+        script_cmd.arg(arg);
+    }
+    let status = script_cmd.status().expect("Unable to execute script");
+    match status.code() {
+        Some(code) => process::exit(code),
+        None => {
+            #[cfg(unix)] {
+                use std::os::unix::process::ExitStatusExt;
+                eprintln!("Script terminated by signal {}", status.signal().unwrap_or(0));
+            }
+            process::exit(4);
+        }
+    };
 }
