@@ -18,41 +18,39 @@ fn cachedir() -> Option<PathBuf> {
             d.push("krust");
             Some(d)
         }
-        None => {
-            match dirs::home_dir() {
-                Some(mut d) => {
-                    d.push(".krust");
-                    d.push("cache");
-                    Some(d)
-                }
-                None => None,
+        None => match dirs::home_dir() {
+            Some(mut d) => {
+                d.push(".krust");
+                d.push("cache");
+                Some(d)
             }
-        }
+            None => None,
+        },
     }
 }
 
 fn digest_path(path: &Path) -> String {
     let os_str = path.as_os_str();
 
-    #[cfg(unix)] {
+    #[cfg(unix)]
+    {
         use std::os::unix::ffi::OsStrExt;
         return digest(os_str.as_bytes());
     }
 
-    #[cfg(windows)] {
+    #[cfg(windows)]
+    {
         // !!! untested
         use std::os::windows::ffi::OsStrExt;
         let bytes = os_str
             .encode_wide()
-            .flat_map(|wchar| {
-                [(wchar >> 8) as u8,
-                 wchar as u8].iter()
-            })
+            .flat_map(|wchar| [(wchar >> 8) as u8, wchar as u8].iter())
             .collect::<Vec<u8>>();
         return digest(&bytes);
     }
 
-    #[cfg(not(any(unix, windows)))] {
+    #[cfg(not(any(unix, windows)))]
+    {
         return digest(os_str.to_string_lossy().as_bytes());
     }
 }
@@ -90,11 +88,14 @@ fn preprocess(input: &fs::File, output_base: &Path) -> io::Result<PathBuf> {
         processed.push_str("\n}\n");
     }
 
-    processed.insert_str(0, "\
+    processed.insert_str(
+        0,
+        "\
         use std::io::*;\n\
         use std::process::exit;\n\
         \n\
-    ");
+    ",
+    );
 
     let mut processed_path = PathBuf::from(output_base);
     processed_path.set_extension("rs");
@@ -110,7 +111,9 @@ fn main() {
             usage();
             process::exit(1);
         }
-        Some(file) => fs::canonicalize(&file).expect(&format!("Unable to get absolute path for {}", &file)),
+        Some(file) => {
+            fs::canonicalize(&file).expect(&format!("Unable to get absolute path for {}", &file))
+        }
     };
 
     loop {
@@ -125,13 +128,19 @@ fn main() {
     }
 
     let cachedir = cachedir().expect("Unable to find a usable cache directory!");
-    fs::create_dir_all(&cachedir).expect(&format!("Error while create cache directory {}", cachedir.display()));
+    fs::create_dir_all(&cachedir).expect(&format!(
+        "Error while create cache directory {}",
+        cachedir.display()
+    ));
 
     let path_digest = digest_path(&script_path);
     let mut executable = cachedir.clone();
     executable.push(path_digest);
 
-    let krustfile = fs::File::open(&script_path).expect(&format!("Unable to open input script {}", script_path.display()));
+    let krustfile = fs::File::open(&script_path).expect(&format!(
+        "Unable to open input script {}",
+        script_path.display()
+    ));
     let processed_path = preprocess(&krustfile, &executable).unwrap();
 
     let compiled = process::Command::new("rustc")
@@ -153,9 +162,13 @@ fn main() {
     match status.code() {
         Some(code) => process::exit(code),
         None => {
-            #[cfg(unix)] {
+            #[cfg(unix)]
+            {
                 use std::os::unix::process::ExitStatusExt;
-                eprintln!("Script terminated by signal {}", status.signal().unwrap_or(0));
+                eprintln!(
+                    "Script terminated by signal {}",
+                    status.signal().unwrap_or(0)
+                );
             }
             process::exit(4);
         }
