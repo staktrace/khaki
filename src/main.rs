@@ -90,6 +90,12 @@ fn preprocess(input: &fs::File, output_base: &Path) -> io::Result<PathBuf> {
         processed.push_str("\n}\n");
     }
 
+    processed.insert_str(0, "\
+        use std::io::*;\n\
+        use std::process::exit;\n\
+        \n\
+    ");
+
     let mut processed_path = PathBuf::from(output_base);
     processed_path.set_extension("rs");
     // TODO: some sort of locking here to avoid concurrently-running `krust` instances writing to `processed_path`
