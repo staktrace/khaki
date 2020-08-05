@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use std::process;
 
 fn usage() {
-    eprintln!("Usage: krust path-to-script.rs [-- args to script]");
+    eprintln!("Usage: krust path-to-script.rs [args to script]");
 }
 
 fn cachedir() -> Option<PathBuf> {
@@ -106,6 +106,7 @@ fn preprocess(input: &fs::File, output_base: &Path) -> io::Result<PathBuf> {
 
 fn main() {
     let mut args = env::args().skip(1);
+    // TODO: read krust options here
     let script_path = match args.next() {
         None => {
             usage();
@@ -115,17 +116,6 @@ fn main() {
             fs::canonicalize(&file).expect(&format!("Unable to get absolute path for {}", &file))
         }
     };
-
-    loop {
-        match args.next() {
-            None => break,
-            Some(x) if x == "--" => break,
-            Some(_) => {
-                usage();
-                process::exit(2);
-            }
-        }
-    }
 
     let cachedir = cachedir().expect("Unable to find a usable cache directory!");
     fs::create_dir_all(&cachedir).expect(&format!(
