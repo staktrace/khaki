@@ -3,6 +3,7 @@ name = "khaki"
 version = "0.1.0"
 authors = ["Kartikaya Gupta"]
 edition = "2018"
+license-file = "LICENSE.txt"
 
 [dependencies]
 dirs = "3.0.1"
