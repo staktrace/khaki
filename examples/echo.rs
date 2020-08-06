@@ -1,4 +1,4 @@
-#!/usr/bin/env krust
+#!/usr/bin/env khaki
 
 let stdin = stdin();
 loop {

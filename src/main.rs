@@ -9,18 +9,18 @@ use std::path::{Path, PathBuf};
 use std::process;
 
 fn usage() {
-    eprintln!("Usage: krust path-to-script.rs [args to script]");
+    eprintln!("Usage: khaki path-to-script.rs [args to script]");
 }
 
 fn cachedir() -> Option<PathBuf> {
     match dirs::cache_dir() {
         Some(mut d) => {
-            d.push("krust");
+            d.push("khaki");
             Some(d)
         }
         None => match dirs::home_dir() {
             Some(mut d) => {
-                d.push(".krust");
+                d.push(".khaki");
                 d.push("cache");
                 Some(d)
             }
@@ -101,14 +101,14 @@ fn preprocess(input: &fs::File, output_base: &Path) -> io::Result<PathBuf> {
 
     let mut processed_path = PathBuf::from(output_base);
     processed_path.set_extension("rs");
-    // TODO: some sort of locking here to avoid concurrently-running `krust` instances writing to `processed_path`
+    // TODO: some sort of locking here to avoid concurrently-running `khaki` instances writing to `processed_path`
     fs::write(&processed_path, processed)?;
     Ok(processed_path)
 }
 
 fn main() {
     let mut args = env::args().skip(1);
-    // TODO: read krust options here
+    // TODO: read khaki options here
     let script_path = match args.next() {
         None => {
             usage();
@@ -129,11 +129,11 @@ fn main() {
     let mut executable = cachedir.clone();
     executable.push(path_digest);
 
-    let krustfile = fs::File::open(&script_path).expect(&format!(
+    let khakifile = fs::File::open(&script_path).expect(&format!(
         "Unable to open input script {}",
         script_path.display()
     ));
-    let processed_path = preprocess(&krustfile, &executable).unwrap();
+    let processed_path = preprocess(&khakifile, &executable).unwrap();
 
     let compiled = process::Command::new("rustc")
         .arg("-o")

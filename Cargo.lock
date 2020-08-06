@@ -96,7 +96,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a69626016442361bde3bcbbe3d68761ac0767fa592ba0bd7f264f3731c5f525f"
 
 [[package]]
-name = "krust"
+name = "khaki"
 version = "0.1.0"
 dependencies = [
  "dirs",
