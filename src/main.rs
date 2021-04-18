@@ -13,19 +13,17 @@ fn usage() {
 }
 
 fn cachedir() -> Option<PathBuf> {
-    match dirs::cache_dir() {
-        Some(mut d) => {
+    match (dirs::cache_dir(), dirs::home_dir()) {
+        (Some(mut d), _) => {
             d.push("khaki");
             Some(d)
         }
-        None => match dirs::home_dir() {
-            Some(mut d) => {
-                d.push(".khaki");
-                d.push("cache");
-                Some(d)
-            }
-            None => None,
-        },
+        (None, Some(mut d)) => {
+            d.push(".khaki");
+            d.push("cache");
+            Some(d)
+        }
+        (None, None) => None,
     }
 }
 
