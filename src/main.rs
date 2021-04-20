@@ -11,6 +11,7 @@ use std::process;
 fn usage() {
     eprintln!("Usage:");
     eprintln!("  khaki --show-cache-dir");
+    eprintln!("  khaki --clear-cache-dir");
     eprintln!("  khaki path-to-script.rs [args to script]");
 }
 
@@ -26,6 +27,16 @@ fn cachedir() -> Option<PathBuf> {
             Some(d)
         }
         (None, None) => None,
+    }
+}
+
+fn require_cachedir() -> PathBuf {
+    match cachedir() {
+        None => {
+            eprintln!("Unable to find a usable cache directory!");
+            process::exit(1);
+        }
+        Some(dir) => dir,
     }
 }
 
@@ -106,22 +117,42 @@ fn preprocess(input: &fs::File, output_base: &Path) -> io::Result<PathBuf> {
     Ok(processed_path)
 }
 
+fn show_cache_dir() -> ! {
+    println!("{}", require_cachedir().display());
+    process::exit(0);
+}
+
+fn clear_cache_dir() -> ! {
+    let cachedir = require_cachedir();
+    match fs::read_dir(&cachedir) {
+        Ok(files) => {
+            for entry in files {
+                match entry {
+                    Err(e) => eprintln!("Error encountered while iterating cache directory {}: {}", cachedir.display(), e),
+                    Ok(file) if file.path().is_file() => {
+                        match fs::remove_file(file.path()) {
+                            Ok(_) => eprintln!("Successfully deleted file {}", file.path().display()),
+                            Err(e) => eprintln!("Unable to delete file {}: {}", file.path().display(), e),
+                        };
+                    }
+                    Ok(_nonfile) => continue,
+                }
+            }
+            process::exit(0);
+        }
+        Err(e) => {
+            eprintln!("Unable to read from cache dir {}: {}", cachedir.display(), e);
+            process::exit(1);
+        }
+    }
+}
+
 fn parse_args<T: Iterator<Item = String>>(args: &mut T) -> Option<String> {
     loop {
         match args.next() {
             None => return None,
-            Some(arg) if arg == "--show-cache-dir" => {
-                match cachedir() {
-                    Some(dir) => {
-                        println!("{}", dir.display());
-                        process::exit(0);
-                    }
-                    None => {
-                        eprintln!("Unable to find a usable cache directory!");
-                        process::exit(1);
-                    }
-                }
-            }
+            Some(arg) if arg == "--show-cache-dir" => show_cache_dir(),
+            Some(arg) if arg == "--clear-cache-dir" => clear_cache_dir(),
             Some(arg) => return Some(arg),
         }
     }
