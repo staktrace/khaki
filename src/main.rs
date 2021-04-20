@@ -91,7 +91,7 @@ fn preprocess(input: &fs::File, output_base: &Path) -> io::Result<PathBuf> {
     processed.insert_str(
         0,
         "\
-        #![allow(unused_imports)]
+        #![allow(unused_imports)]\n\
         use std::env::args;\n\
         use std::io::*;\n\
         use std::process::exit;\n\
