@@ -9,7 +9,9 @@ use std::path::{Path, PathBuf};
 use std::process;
 
 fn usage() {
-    eprintln!("Usage: khaki path-to-script.rs [args to script]");
+    eprintln!("Usage:");
+    eprintln!("  khaki --show-cache-dir");
+    eprintln!("  khaki path-to-script.rs [args to script]");
 }
 
 fn cachedir() -> Option<PathBuf> {
@@ -104,10 +106,30 @@ fn preprocess(input: &fs::File, output_base: &Path) -> io::Result<PathBuf> {
     Ok(processed_path)
 }
 
+fn parse_args<T: Iterator<Item = String>>(args: &mut T) -> Option<String> {
+    loop {
+        match args.next() {
+            None => return None,
+            Some(arg) if arg == "--show-cache-dir" => {
+                match cachedir() {
+                    Some(dir) => {
+                        println!("{}", dir.display());
+                        process::exit(0);
+                    }
+                    None => {
+                        eprintln!("Unable to find a usable cache directory!");
+                        process::exit(1);
+                    }
+                }
+            }
+            Some(arg) => return Some(arg),
+        }
+    }
+}
+
 fn main() {
     let mut args = env::args().skip(1);
-    // TODO: read khaki options here
-    let script_path = match args.next() {
+    let script_path = match parse_args(&mut args) {
         None => {
             usage();
             process::exit(1);
