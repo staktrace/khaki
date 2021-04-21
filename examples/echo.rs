@@ -1,4 +1,4 @@
-#!/usr/bin/env khaki
+#!/usr/bin/env khaki --main
 
 let stdin = stdin();
 loop {

@@ -12,7 +12,7 @@ fn usage() {
     eprintln!("Usage:");
     eprintln!("  khaki --show-cache-dir");
     eprintln!("  khaki --clear-cache-dir");
-    eprintln!("  khaki path-to-script.rs [args to script]");
+    eprintln!("  khaki [--main] path-to-script.rs [args to script]");
 }
 
 fn cachedir() -> Option<PathBuf> {
@@ -75,7 +75,29 @@ fn digest(stuff: &[u8]) -> String {
     hex
 }
 
-fn preprocess(input: &fs::File, output_base: &Path) -> io::Result<PathBuf> {
+fn preprocess_none(input: &fs::File, output_base: &Path) -> io::Result<PathBuf> {
+    use io::BufRead;
+
+    let mut processed = String::new();
+    let bufreader = io::BufReader::new(input);
+    for (number, line) in bufreader.lines().enumerate() {
+        let line = line?;
+        if number == 0 && line.starts_with("#!/") {
+            // assume shebang, so let's drop it. Leave a blank line to preserve line numbers
+            writeln!(processed, "").unwrap();
+            continue;
+        }
+        writeln!(processed, "{}", line).unwrap();
+    }
+
+    let mut processed_path = PathBuf::from(output_base);
+    processed_path.set_extension("rs");
+    // TODO: some sort of locking here to avoid concurrently-running `khaki` instances writing to `processed_path`
+    fs::write(&processed_path, processed)?;
+    Ok(processed_path)
+}
+
+fn preprocess_main(input: &fs::File, output_base: &Path) -> io::Result<PathBuf> {
     use io::BufRead;
 
     let mut has_main = false;
@@ -147,26 +169,35 @@ fn clear_cache_dir() -> ! {
     }
 }
 
-fn parse_args<T: Iterator<Item = String>>(args: &mut T) -> Option<String> {
+enum PreprocessMode {
+    None,
+    Main,
+}
+
+fn parse_args<T: Iterator<Item = String>>(args: &mut T) -> Option<(String, PreprocessMode)> {
+    let mut mode = PreprocessMode::None;
     loop {
         match args.next() {
             None => return None,
             Some(arg) if arg == "--show-cache-dir" => show_cache_dir(),
             Some(arg) if arg == "--clear-cache-dir" => clear_cache_dir(),
-            Some(arg) => return Some(arg),
+            Some(arg) if arg == "--main" => {
+                mode = PreprocessMode::Main;
+            }
+            Some(arg) => return Some((arg, mode)),
         }
     }
 }
 
 fn main() {
     let mut args = env::args().skip(1);
-    let script_path = match parse_args(&mut args) {
+    let (script_path, mode) = match parse_args(&mut args) {
         None => {
             usage();
             process::exit(1);
         }
-        Some(file) => {
-            fs::canonicalize(&file).expect(&format!("Unable to get absolute path for {}", &file))
+        Some((file, mode)) => {
+            (fs::canonicalize(&file).expect(&format!("Unable to get absolute path for {}", &file)), mode)
         }
     };
 
@@ -184,7 +215,10 @@ fn main() {
         "Unable to open input script {}",
         script_path.display()
     ));
-    let processed_path = preprocess(&khakifile, &executable).unwrap();
+    let processed_path = match mode {
+        PreprocessMode::None => preprocess_none(&khakifile, &executable).unwrap(),
+        PreprocessMode::Main => preprocess_main(&khakifile, &executable).unwrap(),
+    };
 
     let compiled = process::Command::new("rustc")
         .arg("-o")
