@@ -1,3 +1,8 @@
+NOTICE
+======
+
+This project is deprecated and unmaintained. There are other alternatives out there that are better, e.g. [rust-script](https://github.com/fornwall/rust-script).
+
 khaki
 ===
 A tool that lets you write quick-and-dirty rust "scripts" with less boilerplate.
